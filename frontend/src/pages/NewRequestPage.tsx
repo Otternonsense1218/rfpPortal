@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import client from '../api/client';
 
 const accountCodeOptions = [
     { value: '1181', label: '1181. Prepaid Insurance' },
@@ -15,6 +18,7 @@ const inputStyle = {
     borderRadius: 'var(--radius-sm)',
     border: '1px solid var(--border-color)'
 };
+
 
 export default function NewRequestPage() {
 
@@ -35,8 +39,16 @@ export default function NewRequestPage() {
     const [repContactEmail, setRepContactEmail] = useState('');
     const [repContactPhone, setRepContactPhone] = useState('');
     const [capitalJustificationFile, setCapitalJustificationFile] = useState<File | null>(null);
+    const [requestedFor, setRequestedFor] = useState('');
+    const [approvingManagerId, setApprovingManagerId] = useState<number | null>(null);
 
 
+    const navigate = useNavigate();
+
+    const { data: managers = [] } = useQuery({
+        queryKey: ['managers'],
+        queryFn: () => client.get('/users/managers').then(r => r.data),
+    });
 
     function addLineItem() {
         setLineItems([...lineItems, { description: '', quantity: 1, unitPrice: 0, accountCode: '', eocNumber: '', itemUrl: '', notes: '', sku: '' }]);
@@ -47,6 +59,35 @@ export default function NewRequestPage() {
             i === index ? { ...item, [field]: value } : item
         );
         setLineItems(updated);
+    }
+
+    async function handleSave(status: 'DRAFT' | 'SUBMITTED') {
+        try {
+            await client.post('/requests', {
+                title,
+                priority,
+                dateNeeded,
+                budgetItem,
+                isAsap,
+                lineItems,
+                isCheckRequest,
+                isCapitalJustification,
+                budgetYear,
+                checkPayableTo,
+                paymentAddress,
+                paymentCity,
+                paymentStateZip,
+                repContactName,
+                repContactEmail,
+                repContactPhone,
+                requestedFor,
+                approvingManagerId,
+                status,
+            })
+            navigate('/');
+        } catch (err) {
+            alert('Error saving request: ' + (err as Error).message);
+        }
     }
 
     return (
@@ -214,7 +255,7 @@ export default function NewRequestPage() {
             <div style={{ marginBottom: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <label style={{ fontWeight: 600 }}>Line Items</label>
-                    <button onClick={addLineItem} style={{ padding: '6px 12px', background: 'var(--bg-lightblue)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+                    <button onClick={addLineItem} style={{ padding: '6px 12px', background: 'var(--bg-darkblue)', color: 'white', fontStyle: 'italic', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
                         + Add Item
                     </button>
                 </div>
@@ -299,19 +340,55 @@ export default function NewRequestPage() {
                     padding: '8px',
                     background: 'var(--bg-darkblue)',
                     borderRadius: 'var(--radius-sm)',
+                    marginBottom: '16px',
                 }}>
-                    {/* blank spans to slight totals */}
+                    {/* blank spans to align totals */}
                     <span /><span /><span />
 
                     <span style={{ display: 'flex', justifyContent: 'right', fontSize: '0.75', fontStyle: 'italic', color: '#fff' }}>Total Items: </span>
                     <strong style={{ color: '#fff' }}>{lineItems.reduce((sum, i) => sum + i.quantity, 0)}</strong>
 
                     <span style={{ display: 'flex', justifyContent: 'right', fontSize: '0.75', fontStyle: 'italic', color: '#fff' }}>Total: </span>
-                    <strong style={{ color: '#fff'}}>${lineItems.reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0).toFixed(2)}</strong>
+                    <strong style={{ color: '#fff' }}>${lineItems.reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0).toFixed(2)}</strong>
                 </div>
+
             </div>
+
+            {/* requested For / By */}
+            <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 600 }}>Requesting by / for</label>
+                <input
+                    value={requestedFor}
+                    onChange={e => setRequestedFor(e.target.value)}
+                    placeholder='Your name or the name of the person this request is for'
+                    style={{ width: '50%', padding: '8px', background: 'var(--bg-lightblue)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}
+                />
+            </div>
+
+            {/* Approving Manager */}
+            <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 600 }}>Approving Manager</label>
+                <select
+                    value={approvingManagerId ?? ''}
+                    onChange={e => setApprovingManagerId(e.target.value ? Number(e.target.value) : null)}
+                    style={{ width: '50%', padding: '8px', background: 'var(--bg-lightblue)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}
+                >
+                    <option value=''>-- Select Manager --</option>
+                    {managers.map((m: { id: number; displayName: string }) => (
+                        <option key={m.id} value={m.id}>{m.displayName}</option>
+                    ))}
+                </select>
+            </div>
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: '12px', marginTop: '8px', justifyContent: 'flex-end' }}>
+                <button onClick={() => handleSave('DRAFT')} style={{ padding: '8px 20px', background: 'var(--bg-lightblue)', color: 'var(--text-secondary)', fontStyle: 'italic', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', fontWeight: 600, cursor: 'pointer' }}>
+                    Save as Draft
+                </button>
+                <button onClick={() => handleSave('SUBMITTED')} style={{ padding: '8px 20px', background: 'var(--ermc-main)', border: 'none', borderRadius: 'var(--radius-sm)', fontWeight: 600, cursor: 'pointer' }}>
+                    Submit Request
+                </button>
+            </div>
+
         </div>
     )
-
-
 }

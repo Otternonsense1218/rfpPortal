@@ -6,6 +6,7 @@ export async function createRequest(req: AuthRequest, res: Response, next: NextF
     try {
         const { title,
             priority,
+            status,
             dateNeeded,
             isAsap, 
             budgetItem, 
@@ -19,7 +20,11 @@ export async function createRequest(req: AuthRequest, res: Response, next: NextF
             paymentStateZip, 
             repContactName, 
             repContactEmail, 
-            repContactPhone } = req.body;
+            repContactPhone,
+            requestedFor,
+            approvingManagerId,
+
+        } = req.body;
 
         if (!title) {
             return res.status(400).json({ error: 'Missing required fields' });
@@ -51,8 +56,10 @@ export async function createRequest(req: AuthRequest, res: Response, next: NextF
                 repContactEmail: repContactEmail ?? null,
                 repContactPhone: repContactPhone ?? null,
                 totalAmount,
-                status: 'DRAFT',
+                status: status ?? 'DRAFT',
                 submittedById: req.user!.userId,
+                requestedFor: requestedFor ?? null,
+                approvingManagerId: approvingManagerId ?? null,
                 lineItems: {
                     create: (lineItems ?? []).map((item: any) => ({
                         description: item.description,

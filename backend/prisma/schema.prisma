@@ -22,6 +22,7 @@ model User {
   attachments   Attachment[]   @relation("AttachmentUploader")
   notifications Notification[]
   receiving     Receiving[]    @relation("ReceivingUser")
+  approvingRequests RfpRequest[] @relation("ApprovingActioner")
 }
 
 enum Role {
@@ -77,6 +78,8 @@ model RfpRequest {
   repContactName String?
   repContactEmail String?
   repContactPhone String?
+  approvingManager User? @relation("ApprovingActioner", fields: [approvingManagerId], references: [id])
+  approvingManagerId Int?
   
 
   lineItems     LineItem[]
