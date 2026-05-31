@@ -1,0 +1,210 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = []
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  isActive     Boolean  @default(true)
+  adUsername   String   @unique
+  email        String   @unique
+  displayName  String
+  passwordHash String?
+  role         Role     @default(EMPLOYEE)
+  createdAt    DateTime @default(now())
+
+  requests      RfpRequest[]
+  approvals     Approval[]     @relation("ApprovalActioner")
+  attachments   Attachment[]   @relation("AttachmentUploader")
+  notifications Notification[]
+  receiving     Receiving[]    @relation("ReceivingUser")
+}
+
+enum Role {
+  EMPLOYEE
+  MANAGER
+  CFO
+  BOARD
+  MATERIALS_MANAGER
+  ADMIN
+}
+
+enum RequestStatus {
+  DRAFT
+  SUBMITTED
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  ORDERED
+  PARTIAL_RECEIVED
+  RECEIVED
+  CANCELED
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model RfpRequest {
+  id            Int           @id @default(autoincrement())
+  requestNumber String        @unique
+  title         String
+  status        RequestStatus @default(DRAFT)
+  priority      Priority      @default(NORMAL)
+  totalAmount   Decimal       @db.Decimal(10, 2)
+  dateNeeded    DateTime?
+  isAsap        Boolean       @default(false)
+  budgetItem    Boolean       @default(false)
+  submittedBy   User          @relation(fields: [submittedById], references: [id])
+  submittedById Int
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  isCheckRequest Boolean       @default(false)
+  isCapitalJustification Boolean       @default(false)
+  requestedFor  String?
+  budgetYear    String?
+  checkPayableTo String?
+  paymentAddress String?
+  paymentCity String?
+  paymentStateZip String?
+  repContactName String?
+  repContactEmail String?
+  repContactPhone String?
+  
+
+  lineItems     LineItem[]
+  approvals     Approval[]
+  attachments   Attachment[]
+  purchaseOrder PurchaseOrder?
+  notifications Notification[]
+}
+
+model LineItem {
+  id          Int      @id @default(autoincrement())
+  sku         String?
+  description String
+  quantity    Int
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  totalPrice  Decimal  @db.Decimal(10, 2)
+  accountCode String?
+  eocNumber   String?
+  itemUrl     String?
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  request   RfpRequest @relation(fields: [requestId], references: [id])
+  requestId Int
+
+  vendor   Vendor? @relation(fields: [vendorId], references: [id])
+  vendorId Int?
+}
+
+model Vendor {
+  id           Int      @id @default(autoincrement())
+  name         String
+  contactName  String?
+  contactEmail String?
+  contactPhone String?
+  website      String?
+  notes        String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  isActive     Boolean  @default(true)
+
+  lineItems      LineItem[]
+  purchaseOrders PurchaseOrder[]
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  OVERRIDDEN
+}
+
+model Approval {
+  id           Int            @id @default(autoincrement())
+  approvalTier Role
+  approver     User           @relation("ApprovalActioner", fields: [approverId], references: [id])
+  approverId   Int
+  request      RfpRequest     @relation(fields: [requestId], references: [id])
+  requestId    Int
+  status       ApprovalStatus @default(PENDING)
+  comments     String?        @db.Text
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  isOverridden Boolean        @default(false)
+  actionedAt   DateTime?
+}
+
+model Attachment {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  fileName  String
+  filePath  String
+  fileSize  Int
+  mimeType  String
+
+  uploadedBy   User @relation("AttachmentUploader", fields: [uploadedById], references: [id])
+  uploadedById Int
+
+  request   RfpRequest @relation(fields: [requestId], references: [id])
+  requestId Int
+}
+
+model PurchaseOrder {
+  id         Int       @id @default(autoincrement())
+  poNumber   String    @unique
+  orderedAt  DateTime  @default(now())
+  expectedAt DateTime?
+  notes      String?   @db.Text
+
+  request   RfpRequest @relation(fields: [requestId], references: [id])
+  requestId Int        @unique
+
+  vendor   Vendor? @relation(fields: [vendorId], references: [id])
+  vendorId Int?
+
+  receivings Receiving[]
+}
+
+model Receiving {
+  id               Int           @id @default(autoincrement())
+  receivedBy       User          @relation("ReceivingUser", fields: [receivedById], references: [id])
+  receivedById     Int
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  purchaseOrderId  Int
+  quantityReceived Int
+  receivedAt       DateTime      @default(now())
+  condition        String?       @db.Text
+  notes            String?       @db.Text
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  message   String   @db.Text
+  isRead    Boolean  @default(false)
+  type      String
+
+  user   User @relation(fields: [userId], references: [id])
+  userId Int
+
+  request   RfpRequest? @relation(fields: [requestId], references: [id])
+  requestId Int?
+}
+
+model ApprovalThreshold {
+  id        Int      @id @default(autoincrement())
+  role      Role     @unique
+  minAmount Decimal  @db.Decimal(10, 2)
+  maxAmount Decimal  @db.Decimal(10, 2)
+  updatedAt DateTime @updatedAt
+}
